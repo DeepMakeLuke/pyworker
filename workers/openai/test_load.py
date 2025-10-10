@@ -16,6 +16,8 @@ import re
 # Headless plotting
 import matplotlib
 matplotlib.use("Agg")
+import logging
+logging.getLogger("matplotlib.font_manager").setLevel(logging.WARNING)
 import matplotlib.pyplot as plt
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
