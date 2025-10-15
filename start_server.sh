@@ -3,8 +3,7 @@
 set -e -o pipefail
 
 WORKSPACE_DIR="${WORKSPACE_DIR:-/workspace}"
-
-SERVER_DIR="$WORKSPACE_DIR/vast-pyworker"
+SERVER_DIR="$WORKSAPCE_DIR/worker"
 ENV_PATH="$WORKSPACE_DIR/worker-env"
 DEBUG_LOG="$WORKSPACE_DIR/debug.log"
 PYWORKER_LOG="$WORKSPACE_DIR/pyworker.log"
@@ -29,11 +28,9 @@ function echo_var(){
 echo "start_server.sh - SDK Worker Version"
 date
 
-echo_var BACKEND
 echo_var REPORT_ADDR
 echo_var WORKER_PORT
 echo_var WORKSPACE_DIR
-echo_var SERVER_DIR
 echo_var ENV_PATH
 echo_var DEBUG_LOG
 echo_var PYWORKER_LOG
