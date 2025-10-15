@@ -22,13 +22,11 @@ function echo_var(){
     echo "$1: ${!1}"
 }
 
-[ -z "$BACKEND" ] && echo "BACKEND must be set!" && exit 1
+# Updated validation - BACKEND no longer required, but MODEL_LOG still is
 [ -z "$MODEL_LOG" ] && echo "MODEL_LOG must be set!" && exit 1
 [ -z "$HF_TOKEN" ] && echo "HF_TOKEN must be set!" && exit 1
-[ "$BACKEND" = "comfyui" ] && [ -z "$COMFY_MODEL" ] && echo "For comfyui backends, COMFY_MODEL must be set!" && exit 1
 
-
-echo "start_server.sh"
+echo "start_server.sh - SDK Worker Version"
 date
 
 echo_var BACKEND
@@ -40,6 +38,9 @@ echo_var ENV_PATH
 echo_var DEBUG_LOG
 echo_var PYWORKER_LOG
 echo_var MODEL_LOG
+echo_var MODEL_SERVER_URL
+echo_var PYWORKER_REPO
+echo_var PYWORKER_REF
 
 # Populate /etc/environment with quoted values
 if ! grep -q "VAST" /etc/environment; then
@@ -58,16 +59,32 @@ then
         source ~/.local/bin/env
     fi
 
-    # Fork testing
-    [[ ! -d $SERVER_DIR ]] && git clone "${PYWORKER_REPO:-https://github.com/vast-ai/pyworker}" "$SERVER_DIR"
+    if [[ ! -d $SERVER_DIR ]]; then
+        echo "Cloning worker repository..."
+        git clone --depth=1 "${PYWORKER_REPO:-https://github.com/vast-ai/pyworker}" "$SERVER_DIR"
+    fi
+
     if [[ -n ${PYWORKER_REF:-} ]]; then
-        (cd "$SERVER_DIR" && git checkout "$PYWORKER_REF")
+        echo "Checking out ref: $PYWORKER_REF"
+        (
+            cd "$SERVER_DIR"
+            git fetch --depth=1 origin "$PYWORKER_REF"
+            git checkout "$PYWORKER_REF"
+        )
     fi
 
     uv venv --python-preference only-managed "$ENV_PATH" -p 3.10
     source "$ENV_PATH/bin/activate"
 
-    uv pip install -r "${SERVER_DIR}/requirements.txt"
+    # Install vast-sdk from server-side-sdk branch
+    echo "Installing vast-sdk from GitHub (server-side-sdk branch)..."
+    uv pip install "git+https://github.com/vast-ai/vast-sdk.git@server-side-sdk"
+
+    # Install requirements from worker repo if they exist
+    if [ -f "${SERVER_DIR}/requirements.txt" ]; then
+        echo "Installing additional dependencies from requirements.txt..."
+        uv pip install -r "${SERVER_DIR}/requirements.txt"
+    fi
 
     touch ~/.no_auto_tmux
 else
@@ -77,7 +94,12 @@ else
     echo "venv: $VIRTUAL_ENV"
 fi
 
-[ ! -d "$SERVER_DIR/workers/$BACKEND" ] && echo "$BACKEND not supported!" && exit 1
+# Check that worker.py exists
+if [ ! -f "$SERVER_DIR/worker.py" ]; then
+    echo "ERROR: worker.py not found in $SERVER_DIR"
+    echo "Please ensure your PYWORKER_REPO contains a worker.py file"
+    exit 1
+fi
 
 if [ "$USE_SSL" = true ]; then
 
@@ -115,9 +137,6 @@ EOF
         POST "https://console.vast.ai/api/v0/sign_cert/?instance_id=$CONTAINER_ID" > /etc/instance.crt;
 fi
 
-
-
-
 export REPORT_ADDR WORKER_PORT USE_SSL UNSECURED
 
 cd "$SERVER_DIR"
@@ -128,5 +147,6 @@ echo "launching PyWorker server"
 # from the run prior to reboot. past logs are saved in $MODEL_LOG.old for debugging only
 [ -e "$MODEL_LOG" ] && cat "$MODEL_LOG" >> "$MODEL_LOG.old" && : > "$MODEL_LOG"
 
-(python3 -m "workers.$BACKEND.server" |& tee -a "$PYWORKER_LOG") &
+# Launch the SDK-based worker instead of the old backend system
+(python3 worker.py |& tee -a "$PYWORKER_LOG") &
 echo "launching PyWorker server done"
