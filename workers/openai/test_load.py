@@ -295,7 +295,7 @@ def run_load_with_metrics(num_requests: int,
     # Latency histogram (total)
     ax1 = axes[0, 1]
     if succ:
-        ax1.hist(total_ms, bins=30, color="#4e79a7")
+        ax1.hist(total_ms, bins=30)
     ax1.set_title("Total latency (ms)")
     ax1.set_xlabel("ms")
     ax1.set_ylabel("freq")
@@ -321,7 +321,7 @@ def run_load_with_metrics(num_requests: int,
         ax_idle.plot(ts, vals, "-o", ms=3)
     ax_idle.set_title("Completions per second")
     ax_idle.set_xlabel("time (s)")
-    ax_idle.set_ylabel("req/s")
+    ax_idle.set_ylabel("completions / sec")
 
     # Summary text
     ax3 = axes[1, 1]
@@ -341,15 +341,24 @@ def run_load_with_metrics(num_requests: int,
     ax3.set_title("Summary")
     ax3.text(0.02, 0.98, text, va="top", ha="left", fontsize=11, transform=ax3.transAxes)
 
-    # Latency CDF (total_ms)
-    ax_cdf = axes[1, 2]
-    if succ:
-        x = np.sort(total_ms)
-        y = np.linspace(0, 1, len(x), endpoint=True)
-        ax_cdf.plot(x, y)
-    ax_cdf.set_title("Latency CDF")
-    ax_cdf.set_xlabel("ms")
-    ax_cdf.set_ylabel("fraction ≤ x")
+    # Error count over time
+    ax_errors = axes[1, 2]
+    all_end_times = [int(r.t_end) for r in results if r.t_end > 0]
+    if all_end_times:
+        min_second = min(all_end_times)
+        max_second = max(all_end_times)
+        # Count errors per second
+        errors_per_second = {}
+        for result in errs:
+            second = int(result.t_end)
+            errors_per_second[second] = errors_per_second.get(second, 0) + 1
+        # Create complete timeline including zeros
+        time_seconds = list(range(min_second, max_second + 1))
+        error_counts = [errors_per_second.get(sec, 0) for sec in time_seconds]
+        ax_errors.plot(time_seconds, error_counts, "-o", ms=3)
+    ax_errors.set_title("Errors per second")
+    ax_errors.set_xlabel("time (s)")
+    ax_errors.set_ylabel("errors / sec")
 
     # Ensure unique output path and create directory if needed
     final_out_path = get_incremented_path(out_path)
