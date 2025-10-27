@@ -6,10 +6,13 @@ from typing import Union, Type, Dict, Any, Optional
 from aiohttp import web, ClientResponse
 import nltk
 import logging
+import time
 
+log = logging.getLogger(__name__)
+t0 = time.time()
 nltk.download("words")
 WORD_LIST = nltk.corpus.words.words()
-log = logging.getLogger(__name__)
+print(f"{time.strftime('%Y-%m-%d %H:%M:%S')} NLTK words download+load took {time.time()-t0:.2f}s")
 
 """
 Generic dataclass accepts any dictionary in input.

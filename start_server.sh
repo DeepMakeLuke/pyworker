@@ -2,6 +2,9 @@
 
 set -e -o pipefail
 
+log() { echo "$(date +'%Y-%m-%d %H:%M:%S') $*"; }
+step(){ _t0=$(date +%s); eval "$1"; _dt=$(($(date +%s)-_t0)); log "$2 took ${_dt}s"; }
+
 WORKSPACE_DIR="${WORKSPACE_DIR:-/workspace}"
 
 SERVER_DIR="$WORKSPACE_DIR/vast-pyworker"
@@ -53,21 +56,16 @@ fi
 if [ ! -d "$ENV_PATH" ]
 then
     echo "setting up venv"
-    if ! which uv; then
-        curl -LsSf https://astral.sh/uv/install.sh | sh
-        source ~/.local/bin/env
-    fi
+    step 'if ! which uv; then curl -LsSf https://astral.sh/uv/install.sh | sh; source ~/.local/bin/env; fi' "uv install"
 
     # Fork testing
-    [[ ! -d $SERVER_DIR ]] && git clone "${PYWORKER_REPO:-https://github.com/vast-ai/pyworker}" "$SERVER_DIR"
-    if [[ -n ${PYWORKER_REF:-} ]]; then
-        (cd "$SERVER_DIR" && git checkout "$PYWORKER_REF")
-    fi
+    step '[[ ! -d $SERVER_DIR ]] && git clone "${PYWORKER_REPO:-https://github.com/vast-ai/pyworker}" "$SERVER_DIR"' "git clone"
+    step 'if [[ -n ${PYWORKER_REF:-} ]]; then (cd "$SERVER_DIR" && git checkout "$PYWORKER_REF"); fi' "git checkout"
 
-    uv venv --python-preference only-managed "$ENV_PATH" -p 3.10
-    source "$ENV_PATH/bin/activate"
 
-    uv pip install -r "${SERVER_DIR}/requirements.txt"
+    step 'uv venv --python-preference only-managed "$ENV_PATH" -p 3.10' "venv create"
+    step 'source "$ENV_PATH/bin/activate"' "venv activate"
+    step 'uv pip install -r "${SERVER_DIR}/requirements.txt"' "pip install requirements"
 
     touch ~/.no_auto_tmux
 else
@@ -80,39 +78,8 @@ fi
 [ ! -d "$SERVER_DIR/workers/$BACKEND" ] && echo "$BACKEND not supported!" && exit 1
 
 if [ "$USE_SSL" = true ]; then
-
-    cat << EOF > /etc/openssl-san.cnf
-    [req]
-    default_bits       = 2048
-    distinguished_name = req_distinguished_name
-    req_extensions     = v3_req
-
-    [req_distinguished_name]
-    countryName         = US
-    stateOrProvinceName = CA
-    organizationName    = Vast.ai Inc.
-    commonName          = vast.ai
-
-    [v3_req]
-    basicConstraints = CA:FALSE
-    keyUsage         = nonRepudiation, digitalSignature, keyEncipherment
-    subjectAltName   = @alt_names
-
-    [alt_names]
-    IP.1   = 0.0.0.0
-EOF
-
-    openssl req -newkey rsa:2048 -subj "/C=US/ST=CA/CN=pyworker.vast.ai/" \
-        -nodes \
-        -sha256 \
-        -keyout /etc/instance.key \
-        -out /etc/instance.csr \
-        -config /etc/openssl-san.cnf
-
-    curl --header 'Content-Type: application/octet-stream' \
-        --data-binary @//etc/instance.csr \
-        -X \
-        POST "https://console.vast.ai/api/v0/sign_cert/?instance_id=$CONTAINER_ID" > /etc/instance.crt;
+  step 'openssl req -newkey rsa:2048 -subj "/C=US/ST=CA/CN=pyworker.vast.ai/" -nodes -sha256 -keyout /etc/instance.key -out /etc/instance.csr -config /etc/openssl-san.cnf' "openssl csr"
+  step 'curl --header "Content-Type: application/octet-stream" --data-binary @//etc/instance.csr -X POST "https://console.vast.ai/api/v0/sign_cert/?instance_id=$CONTAINER_ID" > /etc/instance.crt' "sign cert"
 fi
 
 
@@ -122,11 +89,11 @@ export REPORT_ADDR WORKER_PORT USE_SSL UNSECURED
 
 cd "$SERVER_DIR"
 
-echo "launching PyWorker server"
+log "launching PyWorker server"
 
 # if instance is rebooted, we want to clear out the log file so pyworker doesn't read lines
 # from the run prior to reboot. past logs are saved in $MODEL_LOG.old for debugging only
 [ -e "$MODEL_LOG" ] && cat "$MODEL_LOG" >> "$MODEL_LOG.old" && : > "$MODEL_LOG"
 
-(python3 -m "workers.$BACKEND.server" |& tee -a "$PYWORKER_LOG") &
-echo "launching PyWorker server done"
+_t0=$(date +%s); (python3 -m "workers.$BACKEND.server" |& tee -a "$PYWORKER_LOG") & _dt=$(($(date +%s)-_t0)); log "PyWorker spawn took ${_dt}s"
+log "launching PyWorker server done"

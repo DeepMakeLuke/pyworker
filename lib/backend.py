@@ -73,6 +73,9 @@ class Backend:
         self._total_pubkey_fetch_errors = 0
         self._pubkey = self._fetch_pubkey()
         self.__start_healthcheck: bool = False
+        self._model_tail_start_time = None
+        self._model_loaded_time = None
+        self._first_healthcheck_ok = False
 
     @property
     def pubkey(self) -> Optional[RSA.RsaKey]:
@@ -104,6 +107,7 @@ class Backend:
 
     #######################################Private#######################################
     def _fetch_pubkey(self):
+        t0 = time.time()
         command = ["curl", "-X", "GET", "https://run.vast.ai/pubkey/"]
         result = subprocess.check_output(command, universal_newlines=True)
         log.debug("public key:")
@@ -120,6 +124,8 @@ class Backend:
             self._total_pubkey_fetch_errors += 1
             if self._total_pubkey_fetch_errors >= MAX_PUBKEY_FETCH_ATTEMPTS:
                 self.backend_errored("Failed to get autoscaler pubkey")
+            else:
+                log.debug(f"pubkey fetch+parse took {time.time()-t0:.2f}s")
         return key
 
     async def __handle_request(
@@ -240,6 +246,10 @@ class Backend:
                 log.debug(f"Performing healthcheck on {health_check_url}")
                 async with self.healthcheck_session.get(health_check_url) as response:
                     if response.status == 200:
+                        if not self._first_healthcheck_ok:
+                            if self._model_loaded_time:
+                                log.debug(f"first healthcheck OK after {time.time()-self._model_loaded_time:.2f}s since ModelLoaded")
+                            self._first_healthcheck_ok = True
                         log.debug("Healthcheck successful")
                     elif response.status == 503:
                         log.debug(f"Healthcheck failed with status: {response.status}")
@@ -324,8 +334,11 @@ class Backend:
                 pass
 
             log.debug("Initial run to trigger model loading...")
+            t_bench0 = time.time()
             payload = self.benchmark_handler.make_benchmark_payload()
             await self.__call_api(handler=self.benchmark_handler, payload=payload)
+            log.debug(f"warmup request took {time.time()-t_bench0:.2f}s")
+            t_benchmark_loop0 = time.time()
 
             max_throughput = 0
             sum_throughput = 0
@@ -373,6 +386,7 @@ class Backend:
             log.debug(
                 f"benchmark result: avg {average_throughput} workload per second, max {max_throughput}"
             )
+            log.debug(f"benchmark loop took {time.time()-t_benchmark_loop0:.2f}s")
             with open(BENCHMARK_INDICATOR_FILE, "w") as f:
                 f.write(str(max_throughput))
             return max_throughput
@@ -385,14 +399,17 @@ class Backend:
             for action, msg in self.log_actions:
                 match action:
                     case LogAction.ModelLoaded if msg in log_line:
-                        log.debug(
-                            f"Got log line indicating model is loaded: {log_line}"
-                        )
+                        now = time.time()
+                        elapsed = now - self._model_tail_start_time
+                        log.debug(f"ModelLoaded observed after {elapsed:.2f}s: {log_line}")
                         # some backends need a few seconds after logging successful startup before
                         # they can begin accepting requests
                         await sleep(5)
                         try:
+                            t_bench0 = time.time()
                             max_throughput = await run_benchmark()
+                            self._model_loaded_time = time.time()
+                            log.debug(f"benchmark total took {self._model_loaded_time - t_bench0:.2f}s")
                             self.__start_healthcheck = True
                             self.metrics._model_loaded(
                                 max_throughput=max_throughput,
@@ -411,6 +428,7 @@ class Backend:
 
         async def tail_log():
             log.debug(f"tailing file: {self.model_log_file}")
+            self._model_tail_start_time = time.time()
             async with await open_file(self.model_log_file) as f:
                 while True:
                     line = await f.readline()
