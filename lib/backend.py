@@ -286,7 +286,7 @@ class Backend:
         message = {
             key: value
             for (key, value) in (dataclasses.asdict(auth_data).items())
-            if key != "signature"
+            if key != "signature" and key != "__request_id"
         }
         if auth_data.reqnum < (self.reqnum - MSG_HISTORY_LEN):
             log.debug(
