@@ -325,10 +325,10 @@ class Backend:
                 with open(BENCHMARK_INDICATOR_FILE, "r") as f:
                     log.debug("already ran benchmark")
                     # trigger model load
-                    payload = self.benchmark_handler.make_benchmark_payload()
-                    _ = await self.__call_api(
-                        handler=self.benchmark_handler, payload=payload
-                    )
+                    # payload = self.benchmark_handler.make_benchmark_payload()
+                    # _ = await self.__call_api(
+                    #     handler=self.benchmark_handler, payload=payload
+                    # )
                     return float(f.readline())
             except FileNotFoundError:
                 pass
@@ -404,7 +404,7 @@ class Backend:
                         log.debug(f"ModelLoaded observed after {elapsed:.2f}s: {log_line}")
                         # some backends need a few seconds after logging successful startup before
                         # they can begin accepting requests
-                        await sleep(5)
+                        # await sleep(5)
                         try:
                             t_bench0 = time.time()
                             max_throughput = await run_benchmark()
