@@ -65,12 +65,12 @@ class ApiPayload(ABC):
 class AuthData:
     """data used to authenticate requester"""
 
-    signature: str
     cost: str
     endpoint: str
     reqnum: int
-    url: str
     request_idx: int
+    signature: str
+    url: str
 
     @classmethod
     def from_json_msg(cls, json_msg: Dict[str, Any]):

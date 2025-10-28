@@ -296,7 +296,7 @@ class Backend:
         elif message in self.msg_history:
             log.debug(f"message: {message} already in message history")
             return False
-        elif verify_signature(json.dumps(message, indent=4), auth_data.signature):
+        elif verify_signature(json.dumps(message, indent=4, sort_keys=True), auth_data.signature):
             self.reqnum = max(auth_data.reqnum, self.reqnum)
             self.msg_history.append(message)
             self.msg_history = self.msg_history[-MSG_HISTORY_LEN:]
