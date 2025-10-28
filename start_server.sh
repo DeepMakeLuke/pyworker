@@ -44,14 +44,14 @@ echo_var DEBUG_LOG
 echo_var PYWORKER_LOG
 echo_var MODEL_LOG
 
-# Populate /etc/environment with quoted values
-if ! grep -q "VAST" /etc/environment; then
-    env -0 | grep -zEv "^(HOME=|SHLVL=)|CONDA" | while IFS= read -r -d '' line; do
-            name=${line%%=*}
-            value=${line#*=}
-            printf '%s="%s"\n' "$name" "$value"
-        done > /etc/environment
-fi
+# # Populate /etc/environment with quoted values
+# if ! grep -q "VAST" /etc/environment; then
+#     env -0 | grep -zEv "^(HOME=|SHLVL=)|CONDA" | while IFS= read -r -d '' line; do
+#             name=${line%%=*}
+#             value=${line#*=}
+#             printf '%s="%s"\n' "$name" "$value"
+#         done > /etc/environment
+# fi
 
 if [ ! -d "$ENV_PATH" ]
 then
