@@ -1,3 +1,5 @@
+import dataclasses
+from enum import Enum
 import os
 import sys
 import random
@@ -13,6 +15,12 @@ from lib.data_types import ApiPayload, JsonDataException
 
 log = logging.getLogger(__file__)
 
+class ModelType(Enum):
+    image = "image"
+    audio = "audio"
+    video = "video"
+
+
 def count_workload() -> float:
     # Always 100.0 where there is a single instance of ComfyUI handling requests
     # Results will indicate % or a job completed per second.  Avoids sub 0.1 sec performance indication
@@ -21,6 +29,11 @@ def count_workload() -> float:
 @dataclasses.dataclass
 class ComfyWorkflowData(ApiPayload):
     input: dict
+    model_type: ModelType = dataclasses.field(
+        default_factory=lambda: ModelType(
+            os.environ.get("MODEL_TYPE", "image").lower()
+        )
+    )
 
     @classmethod
     def for_test(cls):
@@ -30,15 +43,17 @@ class ComfyWorkflowData(ApiPayload):
         Example: SD1.5, simple image gen 10000 steps, 512px x 512px will run for approximately 9 minutes @ ~18 it/s (RTX 4090)
         """
         # Try to load benchmark.json
-        benchmark_file = Path("workers/comfyui-json/misc/benchmark.json")
-        
+        #Note:  We should cross check with Rob if the audio sample benchmark file is correct
+        model_type = ModelType(os.environ.get("MODEL_TYPE", "image").lower())
+        benchmark_file = Path(f"workers/comfyui-json/misc/benchmark_{model_type.value}.json")
         if benchmark_file.exists():
             try:
                 with open(benchmark_file, "r") as f:
                     benchmark_workflow = json.load(f)
+                log.info(f"using benchmark json file for {model_type.value}")
                 return cls(
                     input={
-                        "request_id": f"test-{random.randint(1000, 99999)}",
+                        "request_id": f"{model_type.value}-{random.randint(1000, 99999)}",
                         "workflow_json": benchmark_workflow
                     }
                 )

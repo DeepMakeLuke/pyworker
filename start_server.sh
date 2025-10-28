@@ -12,6 +12,7 @@ PYWORKER_LOG="$WORKSPACE_DIR/pyworker.log"
 REPORT_ADDR="${REPORT_ADDR:-https://run.vast.ai}"
 USE_SSL="${USE_SSL:-true}"
 WORKER_PORT="${WORKER_PORT:-3000}"
+MODEL_TYPE="${MODEL_TYPE:-image}"
 mkdir -p "$WORKSPACE_DIR"
 cd "$WORKSPACE_DIR"
 
