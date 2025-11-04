@@ -43,6 +43,7 @@ backend = Backend(
             for error_msg in MODEL_SERVER_ERROR_LOG_MSGS
         ],
     ],
+    max_wait_time=600
 )
 
 
