@@ -419,7 +419,7 @@ class Backend:
             log.debug(f"tailing file: {self.model_log_file}")
             async with await open_file(self.model_log_file, mode="r", encoding='utf-8', errors='ignore') as f:
                 try:
-                    f.seek(0)
+                    await f.seek(0)
                 except:
                     pass
                 while True:
