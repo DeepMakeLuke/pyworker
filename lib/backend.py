@@ -417,7 +417,7 @@ class Backend:
 
         async def tail_log():
             log.debug(f"tailing file: {self.model_log_file}")
-            async with await open_file(self.model_log_file, encoding='utf-8', errors='ignore') as f:
+            async with await open_file(self.model_log_file, mode="r", encoding='utf-8', errors='ignore') as f:
                 while True:
                     line = await f.readline()
                     if line:
@@ -431,4 +431,4 @@ class Backend:
             if os.path.isfile(self.model_log_file) is True:
                 return await tail_log()
             else:
-                await sleep(1)
+                await asyncio.sleep(1)
