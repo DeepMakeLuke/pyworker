@@ -124,9 +124,5 @@ cd "$SERVER_DIR"
 
 echo "launching PyWorker server"
 
-# if instance is rebooted, we want to clear out the log file so pyworker doesn't read lines
-# from the run prior to reboot. past logs are saved in $MODEL_LOG.old for debugging only
-[ -e "$MODEL_LOG" ] && cat "$MODEL_LOG" >> "$MODEL_LOG.old" && : > "$MODEL_LOG"
-
 (python3 -m "workers.$BACKEND.server" |& tee -a "$PYWORKER_LOG") &
 echo "launching PyWorker server done"
