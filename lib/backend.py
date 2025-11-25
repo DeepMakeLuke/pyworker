@@ -235,10 +235,14 @@ class Backend:
             log.debug("No healthcheck endpoint defined, skipping healthcheck")
             return
 
+        first_healthcheck = True
         while True:
             await sleep(10)
             if self.__start_healthcheck is False:
                 continue
+            if first_healthcheck:
+                log.info(f"[healthcheck] First healthcheck starting (model is now loaded)")
+                first_healthcheck = False
             try:
                 log.debug(f"Performing healthcheck on {health_check_url}")
                 async with self.healthcheck_session.get(health_check_url) as response:
@@ -412,10 +416,12 @@ class Backend:
                         # await sleep(5)
                         try:
                             max_throughput = await run_benchmark()
+                            log.info(f"[benchmark] Benchmark complete, max_throughput={max_throughput}, setting healthcheck=True")
                             self.__start_healthcheck = True
                             self.metrics._model_loaded(
                                 max_throughput=max_throughput,
                             )
+                            log.info(f"[benchmark] _model_loaded() called, returning from handle_log_line")
                         except ClientConnectorError as e:
                             log.debug(
                                 f"failed to connect to model api during benchmark"

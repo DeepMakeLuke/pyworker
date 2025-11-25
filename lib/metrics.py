@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import logging
 import json
@@ -15,6 +16,14 @@ METRICS_UPDATE_INTERVAL = 1
 DELETE_REQUESTS_INTERVAL = 1
 
 log = logging.getLogger(__file__)
+
+
+def _flush_logs():
+    """Force flush all log handlers and stdout/stderr."""
+    for handler in logging.root.handlers:
+        handler.flush()
+    sys.stdout.flush()
+    sys.stderr.flush()
 
 
 @cache
@@ -120,6 +129,7 @@ class Metrics:
 
     async def _send_metrics_loop(self) -> Awaitable[NoReturn]:
         loop_count = 0
+        first_loaded_send_done = False
         while True:
             await sleep(METRICS_UPDATE_INTERVAL)
             loop_count += 1
@@ -127,19 +137,32 @@ class Metrics:
             # Log heartbeat every 30 seconds to confirm loop is running
             if loop_count % 30 == 0:
                 log.debug(f"[heartbeat] metrics loop alive, loop_count={loop_count}, model_loaded={self.system_metrics.model_is_loaded}")
+                _flush_logs()
+            # Extra logging for first few iterations after model loads
+            if self.system_metrics.model_is_loaded and not first_loaded_send_done:
+                log.info(f"[transition] First iteration with model_loaded=True, loop_count={loop_count}, elapsed={elapsed:.1f}")
+                _flush_logs()
             if self.system_metrics.model_is_loaded is False and elapsed >= 10:
                 log.debug(f"sending loading model metrics after {int(elapsed)}s wait")
                 await self.__send_metrics_and_reset()
             elif self.update_pending or elapsed > 10:
                 log.debug(f"sending loaded model metrics after {int(elapsed)}s wait")
                 await self.__send_metrics_and_reset()
+                if self.system_metrics.model_is_loaded and not first_loaded_send_done:
+                    first_loaded_send_done = True
+                    log.info(f"[transition] First loaded metrics send complete, continuing to next iteration...")
+                    _flush_logs()
 
     def _model_loaded(self, max_throughput: float) -> None:
+        log.info(f"MODEL LOADED: Setting model_is_loaded=True, max_throughput={max_throughput}")
+        _flush_logs()
         self.system_metrics.model_loading_time = (
             time.time() - self.system_metrics.model_loading_start
         )
         self.system_metrics.model_is_loaded = True
         self.model_metrics.max_throughput = max_throughput
+        log.info(f"MODEL LOADED: model_loading_time={self.system_metrics.model_loading_time}")
+        _flush_logs()
 
     def _model_errored(self, error_msg: str) -> None:
         self.model_metrics.set_errored(error_msg)
@@ -276,6 +299,7 @@ class Metrics:
         ###########
 
         self.system_metrics.update_disk_usage()
+        had_loadtime = loadtime_snapshot is not None and loadtime_snapshot > 0
 
         sent = False
         for report_addr in self.report_addr:
@@ -284,8 +308,14 @@ class Metrics:
                 break
 
         if sent:
+            if had_loadtime:
+                log.info(f"FIRST LOADTIME METRICS SENT SUCCESSFULLY! loadtime={loadtime_snapshot}")
+                _flush_logs()
             # clear the one-shot loadtime only if we actually sent *this* value
             self.system_metrics.reset(expected=loadtime_snapshot)
             self.update_pending = False
             self.model_metrics.reset()
             self.last_metric_update = time.time()
+            if had_loadtime:
+                log.info(f"POST-SEND: reset complete, last_metric_update={self.last_metric_update}, continuing loop...")
+                _flush_logs()
