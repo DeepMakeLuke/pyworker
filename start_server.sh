@@ -133,8 +133,19 @@ cd "$SERVER_DIR"
 echo "launching PyWorker server"
 
 set +e
-python3 -m "workers.$BACKEND.server" |& tee -a "$PYWORKER_LOG"
+
+# Try worker entrypoint first
+echo "trying workers.${BACKEND}.worker"
+python3 -m "workers.${BACKEND}.worker" |& tee -a "$PYWORKER_LOG"
 PY_STATUS=${PIPESTATUS[0]}
+
+# If that fails, fall back to server
+if [ "${PY_STATUS}" -ne 0 ]; then
+  echo "workers.${BACKEND}.worker failed with status ${PY_STATUS}, trying workers.${BACKEND}.server"
+  python3 -m "workers.${BACKEND}.server" |& tee -a "$PYWORKER_LOG"
+  PY_STATUS=${PIPESTATUS[0]}
+fi
+
 set -e
 
 if [ "${PY_STATUS}" -ne 0 ]; then
