@@ -119,9 +119,14 @@ class Metrics:
                 await self.__send_delete_requests_and_reset()
 
     async def _send_metrics_loop(self) -> Awaitable[NoReturn]:
+        loop_count = 0
         while True:
             await sleep(METRICS_UPDATE_INTERVAL)
+            loop_count += 1
             elapsed = time.time() - self.last_metric_update
+            # Log heartbeat every 30 seconds to confirm loop is running
+            if loop_count % 30 == 0:
+                log.debug(f"[heartbeat] metrics loop alive, loop_count={loop_count}, model_loaded={self.system_metrics.model_is_loaded}")
             if self.system_metrics.model_is_loaded is False and elapsed >= 10:
                 log.debug(f"sending loading model metrics after {int(elapsed)}s wait")
                 await self.__send_metrics_and_reset()

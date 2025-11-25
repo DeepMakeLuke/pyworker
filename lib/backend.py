@@ -256,6 +256,7 @@ class Backend:
                 self.backend_errored(str(e))
 
     async def _start_tracking(self) -> None:
+        log.info("Starting tracking tasks (read_logs, send_metrics_loop, healthcheck, send_delete_requests_loop)")
         task_names = ["read_logs", "send_metrics_loop", "healthcheck", "send_delete_requests_loop"]
         results = await gather(
             self.__read_logs(), 
@@ -265,6 +266,7 @@ class Backend:
             return_exceptions=True
         )
         # If we get here, one or more tasks exited (they should run forever)
+        log.error(f"CRITICAL: _start_tracking gather returned! This should never happen. Results: {results}")
         for name, result in zip(task_names, results):
             if isinstance(result, Exception):
                 log.error(f"Tracking task '{name}' crashed with exception: {result}", exc_info=result)

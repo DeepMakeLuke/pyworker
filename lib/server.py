@@ -1,5 +1,7 @@
 import os
 import logging
+import signal
+import sys
 from typing import List
 import ssl
 from asyncio import run, gather
@@ -12,7 +14,25 @@ from aiohttp import web
 log = logging.getLogger(__file__)
 
 
+def _setup_signal_handlers():
+    """Setup signal handlers to log when process receives termination signals."""
+    def signal_handler(signum, frame):
+        sig_name = signal.Signals(signum).name
+        log.error(f"SIGNAL RECEIVED: {sig_name} ({signum}) - process is being terminated")
+        sys.stdout.flush()
+        sys.stderr.flush()
+        sys.exit(128 + signum)
+    
+    # Handle common termination signals
+    for sig in [signal.SIGTERM, signal.SIGINT, signal.SIGHUP]:
+        try:
+            signal.signal(sig, signal_handler)
+        except (OSError, ValueError):
+            pass  # Some signals may not be available
+
+
 def start_server(backend: Backend, routes: List[web.RouteDef], **kwargs):
+    _setup_signal_handlers()
     try:
         log.debug("getting certificate...")
         use_ssl = os.environ.get("USE_SSL", "false") == "true"
