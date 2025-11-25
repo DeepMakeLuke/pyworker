@@ -256,9 +256,20 @@ class Backend:
                 self.backend_errored(str(e))
 
     async def _start_tracking(self) -> None:
-        await gather(
-            self.__read_logs(), self.metrics._send_metrics_loop(), self.__healthcheck(), self.metrics._send_delete_requests_loop()
+        task_names = ["read_logs", "send_metrics_loop", "healthcheck", "send_delete_requests_loop"]
+        results = await gather(
+            self.__read_logs(), 
+            self.metrics._send_metrics_loop(), 
+            self.__healthcheck(), 
+            self.metrics._send_delete_requests_loop(),
+            return_exceptions=True
         )
+        # If we get here, one or more tasks exited (they should run forever)
+        for name, result in zip(task_names, results):
+            if isinstance(result, Exception):
+                log.error(f"Tracking task '{name}' crashed with exception: {result}", exc_info=result)
+            elif result is not None:
+                log.warning(f"Tracking task '{name}' exited unexpectedly with result: {result}")
 
     def backend_errored(self, msg: str) -> None:
         self.metrics._model_errored(msg)
@@ -405,9 +416,12 @@ class Backend:
                             )
                         except ClientConnectorError as e:
                             log.debug(
-                                f"failed to connect to comfyui api during benchmark"
+                                f"failed to connect to model api during benchmark"
                             )
                             self.backend_errored(str(e))
+                        except Exception as e:
+                            log.error(f"Unexpected error during benchmark: {e}", exc_info=True)
+                            self.backend_errored(f"Benchmark failed: {e}")
                     case LogAction.ModelError if msg in log_line:
                         log.debug(f"Got log line indicating error: {log_line}")
                         self.backend_errored(msg)
@@ -419,10 +433,14 @@ class Backend:
             log.debug(f"tailing file: {self.model_log_file}")
             async with await open_file(self.model_log_file, encoding='utf-8', errors='ignore') as f:
                 while True:
-                    line = await f.readline()
-                    if line:
-                        await handle_log_line(line.rstrip())
-                    else:
+                    try:
+                        line = await f.readline()
+                        if line:
+                            await handle_log_line(line.rstrip())
+                        else:
+                            await asyncio.sleep(LOG_POLL_INTERVAL)
+                    except Exception as e:
+                        log.error(f"Error processing log line: {e}", exc_info=True)
                         await asyncio.sleep(LOG_POLL_INTERVAL)
 
         ###########
