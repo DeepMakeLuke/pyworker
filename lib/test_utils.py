@@ -75,6 +75,7 @@ def print_truncate_res(res: str):
 @dataclass
 class ClientState:
     endpoint_group_name: str
+    endpoint_id: int
     api_key: str
     server_url: str
     worker_endpoint: str
@@ -95,7 +96,7 @@ class ClientState:
             self.status = ClientStatus.Error
             return
         route_payload = {
-            "endpoint": self.endpoint_group_name,
+            "endpoint_id": self.endpoint_id,
             "api_key": self.api_key,
             "cost": self.payload.count_workload(),
         }
@@ -244,16 +245,19 @@ def run_test(
     print_thread = threading.Thread(target=print_state, args=(clients, num_requests))
     print_thread.daemon = True  # makes threads get killed on program exit
     print_thread.start()
-    endpoint_api_key = Endpoint.get_endpoint_api_key(
+    endpoint_info = Endpoint.get_endpoint_info(
         endpoint_name=endpoint_group_name, account_api_key=api_key, instance=instance
     )
-    if not endpoint_api_key:
+    if not endpoint_info:
         log.debug(f"Endpoint {endpoint_group_name} not found for API key")
         return
+    endpoint_id = endpoint_info["id"]
+    endpoint_api_key = endpoint_info["api_key"]
     try:
         for _ in range(num_requests):
             client = ClientState(
                 endpoint_group_name=endpoint_group_name,
+                endpoint_id=endpoint_id,
                 api_key=endpoint_api_key,
                 server_url=server_url,
                 worker_endpoint=worker_endpoint,

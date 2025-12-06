@@ -13,11 +13,11 @@ from vastai import Serverless
 ENDPOINT_NAME = "my-comfyui-endpoint"
 COST = 100 # Use a constant cost for image generation
 
-def call_default_workflow(client: Serverless) -> None:
+def call_default_workflow(endpoint_id: int, api_key: str, server_url: str) -> None:
     WORKER_ENDPOINT = "/prompt"
     COST = 100
     route_payload = {
-        "endpoint": endpoint_group_name,
+        "endpoint_id": endpoint_id,
         "api_key": api_key,
         "cost": COST,
     }
@@ -32,7 +32,7 @@ def call_default_workflow(client: Serverless) -> None:
     auth_data = dict(
         signature=message["signature"],
         cost=message["cost"],
-        endpoint=message["endpoint"],
+        endpoint_id=message["endpoint_id"],
         reqnum=message["reqnum"],
         url=message["url"],
     )
@@ -52,12 +52,12 @@ def call_default_workflow(client: Serverless) -> None:
 
 
 def call_custom_workflow_for_sd3(
-    endpoint_group_name: str, api_key: str, server_url: str
+    endpoint_id: int, api_key: str, server_url: str
 ) -> None:
     WORKER_ENDPOINT = "/custom-workflow"
     COST = 100
     route_payload = {
-        "endpoint": endpoint_group_name,
+        "endpoint_id": endpoint_id,
         "api_key": api_key,
         "cost": COST,
     }
@@ -72,7 +72,7 @@ def call_custom_workflow_for_sd3(
     auth_data = dict(
         signature=message["signature"],
         cost=message["cost"],
-        endpoint=message["endpoint"],
+        endpoint_id=message["endpoint_id"],
         reqnum=message["reqnum"],
         url=message["url"],
         request_idx=message["request_idx"],
@@ -146,25 +146,28 @@ def call_custom_workflow_for_sd3(
 if __name__ == "__main__":
     from lib.test_utils import test_args
 
+    log = logging.getLogger(__name__)
     args = test_args.parse_args()
-    endpoint_api_key = Endpoint.get_endpoint_api_key(
+    endpoint_info = Endpoint.get_endpoint_info(
         endpoint_name=args.endpoint_group_name,
         account_api_key=args.api_key,
         instance=args.instance,
     )
-    if endpoint_api_key:
+    if endpoint_info:
+        endpoint_id = endpoint_info["id"]
+        endpoint_api_key = endpoint_info["api_key"]
         try:
             call_default_workflow(
+                endpoint_id=endpoint_id,
                 api_key=endpoint_api_key,
-                endpoint_group_name=args.endpoint_group_name,
                 server_url=args.server_url,
             )
             call_custom_workflow_for_sd3(
+                endpoint_id=endpoint_id,
                 api_key=endpoint_api_key,
-                endpoint_group_name=args.endpoint_group_name,
                 server_url=args.server_url,
             )
         except Exception as e:
             log.error(f"Error during API call: {e}")
     else:
-        log.error(f"Failed to get API key for endpoint {args.endpoint_group_name} ")
+        log.error(f"Failed to get endpoint info for {args.endpoint_group_name}")

@@ -60,7 +60,7 @@ def do_one(endpoint_name: str,
            worker_session):
     try:
         workload = payload.count_workload()
-        route_payload = {"endpoint": endpoint_name, "api_key": endpoint_api_key, "cost": workload}
+        route_payload = {"endpoint_id": endpoint_id, "api_key": endpoint_api_key, "cost": workload}
         headers = {"Authorization": f"Bearer {endpoint_api_key}"}
         start = time.time()
         r0 = route_session.post(urljoin(server_url, "/route/"), json=route_payload, headers=headers, timeout=4)

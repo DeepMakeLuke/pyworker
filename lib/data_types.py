@@ -66,7 +66,7 @@ class AuthData:
     """data used to authenticate requester"""
 
     cost: str
-    endpoint: str
+    endpoint_id: int
     reqnum: int
     request_idx: int
     signature: str
