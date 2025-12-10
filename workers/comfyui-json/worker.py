@@ -66,7 +66,6 @@ worker_config = WorkerConfig(
             route="/generate/sync",
             allow_parallel_requests=False,
             max_queue_time=10.0,
-            request_parser=parse_request,
             benchmark_config=BenchmarkConfig(
                 dataset=benchmark_dataset,
             )
