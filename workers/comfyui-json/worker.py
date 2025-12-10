@@ -39,8 +39,6 @@ benchmark_prompts = [
 ]
 
 
-def parse_request(json_msg):
-    return {"input" : json_msg}
 
 benchmark_dataset = [
     {
