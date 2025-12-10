@@ -38,9 +38,6 @@ benchmark_prompts = [
     "Pope Francis DJ in leather jacket, mixing on giant console; dramatic.",
 ]
 
-def parse_request(json_msg):
-    return {"input" : json_msg}
-
 benchmark_dataset = [
     {
         "input": {
@@ -274,11 +271,11 @@ worker_config = WorkerConfig(
             route="/generate/sync",
             allow_parallel_requests=False,
             max_queue_time=10.0,
-            request_parser=parse_request,
             benchmark_config=BenchmarkConfig(
                 dataset=benchmark_dataset,
                 runs=1
-            )
+            ),
+            workload_calculator= lambda _ : 10000.0
         )
     ],
     log_action_config=LogActionConfig(

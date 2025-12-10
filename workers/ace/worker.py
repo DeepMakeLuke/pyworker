@@ -38,10 +38,6 @@ benchmark_lyrics = [
     "[verse]\nCrowds ignite in vibrant flare\nBeats explode through smoky air\nDJ robes replaced with flame\nPope on decks in holy frame\n\n[verse]\nLeather gleams in blinding light\nTurntables spin with sacred might\nChoirs echo in the bass\nHeaven pulses through the place\n\n[chorus]\nLift the roof and shake the floor\nSacred rhythm evermore\nLet the music take control\nFeel the blessing in your soul",
 ]
 
-
-def parse_request(json_msg):
-    return {"input" : json_msg}
-
 benchmark_dataset = [
     {
         "input": {
@@ -171,11 +167,11 @@ worker_config = WorkerConfig(
             route="/generate/sync",
             allow_parallel_requests=False,
             max_queue_time=10.0,
-            request_parser=parse_request,
             benchmark_config=BenchmarkConfig(
                 dataset=benchmark_dataset,
                 runs=1
-            )
+            ),
+            workload_calculator= lambda _ : 1000.0
         )
     ],
     log_action_config=LogActionConfig(
