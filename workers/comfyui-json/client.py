@@ -1,4 +1,3 @@
-from .data_types import count_workload
 import uuid
 import random
 import asyncio
@@ -25,7 +24,7 @@ async def main():
             }
         }
         
-        response = await endpoint.request("/generate/sync", payload, cost=count_workload())
+        response = await endpoint.request("/generate/sync", payload, cost=100)
 
         # Get the file from the path on the local machine using SCP or SFTP
         # or configure S3 to upload to cloud storage.
