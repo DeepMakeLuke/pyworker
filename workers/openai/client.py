@@ -108,7 +108,7 @@ async def call_completions(client: Serverless, *, model: str, prompt: str, **kwa
         "temperature": kwargs.get("temperature", DEFAULT_TEMPERATURE),
     }
     log.debug("POST /v1/completions %s", json.dumps(payload)[:500])
-    resp = await endpoint.request("/v1/completions", payload, cost=payload["input"]["max_tokens"])
+    resp = await endpoint.request("/v1/completions", payload, cost=payload["max_tokens"])
     return resp["response"]
 
 async def call_chat_completions(client: Serverless, *, model: str, messages: List[Dict[str, Any]], **kwargs) -> Dict[str, Any]:
@@ -124,7 +124,7 @@ async def call_chat_completions(client: Serverless, *, model: str, messages: Lis
         **({"tool_choice": kwargs["tool_choice"]} if "tool_choice" in kwargs else {}),
     }
     log.debug("POST /v1/chat/completions %s", json.dumps(payload)[:500])
-    resp = await endpoint.request("/v1/chat/completions", payload, cost=payload["input"]["max_tokens"])
+    resp = await endpoint.request("/v1/chat/completions", payload, cost=payload["max_tokens"])
     return resp["response"]
 
 # ---- Streaming variants ----
@@ -141,7 +141,7 @@ async def stream_completions(client: Serverless, *, model: str, prompt: str, **k
         **({"stop": kwargs["stop"]} if "stop" in kwargs else {}),
     }
     log.debug("STREAM /v1/completions %s", json.dumps(payload)[:500])
-    resp = await endpoint.request("/v1/completions", payload, cost=payload["input"]["max_tokens"], stream=True)
+    resp = await endpoint.request("/v1/completions", payload, cost=payload["max_tokens"], stream=True)
     return resp["response"]  # async generator
 
 async def stream_chat_completions(client: Serverless, *, model: str, messages: List[Dict[str, Any]], **kwargs):
@@ -158,7 +158,7 @@ async def stream_chat_completions(client: Serverless, *, model: str, messages: L
         **({"tool_choice": kwargs["tool_choice"]} if "tool_choice" in kwargs else {}),
     }
     log.debug("STREAM /v1/chat/completions %s", json.dumps(payload)[:500])
-    resp = await endpoint.request("/v1/chat/completions", payload, cost=payload["input"]["max_tokens"], stream=True)
+    resp = await endpoint.request("/v1/chat/completions", payload, cost=payload["max_tokens"], stream=True)
     return resp["response"]  # async generator
 
 
