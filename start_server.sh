@@ -75,34 +75,14 @@ if [ -e "$MODEL_LOG" ]; then
     fi
 fi
 
-ENV_SENTINEL="VAST_ENV_INITIALIZED=1"
-
-if ! grep -qxF "$ENV_SENTINEL" /etc/environment 2>/dev/null; then
-    {
-        echo "$ENV_SENTINEL"
-
-        # Serialize current environment
-        env -0 | while IFS= read -r -d '' kv; do
-            name=${kv%%=*}
-            value=${kv#*=}
-
-            # Skip volatile or shell-internal variables
-            case "$name" in
-                HOME|SHLVL|PWD|OLDPWD|_ ) continue ;;
-            esac
-
-            # Escape backslashes, quotes, and newlines
-            value=${value//\\/\\\\}
-            value=${value//\"/\\\"}
-            value=${value//$'\n'/\\n}
-
+# Populate /etc/environment with quoted values
+if ! grep -q "VAST" /etc/environment; then
+    if ! env -0 | grep -zEv "^(HOME=|SHLVL=)|CONDA" | while IFS= read -r -d '' line; do
+            name=${line%%=*}
+            value=${line#*=}
             printf '%s="%s"\n' "$name" "$value"
-        done
-    } > /etc/environment.tmp
-
-    if ! mv /etc/environment.tmp /etc/environment; then
-        echo "WARNING: Failed to update /etc/environment, continuing anyway"
-        rm -f /etc/environment.tmp
+        done > /etc/environment; then
+        echo "WARNING: Failed to populate /etc/environment, continuing anyway"
     fi
 fi
 
