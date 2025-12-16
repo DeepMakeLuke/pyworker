@@ -18,7 +18,7 @@ logging.basicConfig(
 log = logging.getLogger(__file__)
 
 # ---------------------- Prompts ----------------------
-COMPLETIONS_PROMPT = "the capital of USA is"
+COMPLETIONS_PROMPT = "Zebras are primarily grazers and can subsist on lower-quality vegetation. They are preyed on mainly by"
 CHAT_PROMPT = "Think step by step: Tell me about the Python programming language."
 TOOLS_PROMPT = (
     "Can you list the files in the current working directory and tell me what you see? "
@@ -97,9 +97,9 @@ def _tool_state_to_message_tool_calls(state: Dict[int, Dict[str, Any]]) -> List[
 
 
 # ---- OpenAI-compatible calls (non-streaming) ----
-async def call_completions(client: Serverless, *, model: str, prompt: str, **kwargs) -> Dict[str, Any]:
+async def call_completions(client: Serverless, *, model: str, prompt: str, endpoint_name: str, **kwargs) -> Dict[str, Any]:
 
-    endpoint = await client.get_endpoint(name=ENDPOINT_NAME)
+    endpoint = await client.get_endpoint(name=endpoint_name)
 
     payload = {
         "model": model,
@@ -111,9 +111,9 @@ async def call_completions(client: Serverless, *, model: str, prompt: str, **kwa
     resp = await endpoint.request("/v1/completions", payload, cost=payload["max_tokens"])
     return resp["response"]
 
-async def call_chat_completions(client: Serverless, *, model: str, messages: List[Dict[str, Any]], **kwargs) -> Dict[str, Any]:
+async def call_chat_completions(client: Serverless, *, model: str, messages: List[Dict[str, Any]], endpoint_name: str, **kwargs) -> Dict[str, Any]:
 
-    endpoint = await client.get_endpoint(name=ENDPOINT_NAME)
+    endpoint = await client.get_endpoint(name=endpoint_name)
 
     payload = {
         "model": model,
@@ -128,9 +128,9 @@ async def call_chat_completions(client: Serverless, *, model: str, messages: Lis
     return resp["response"]
 
 # ---- Streaming variants ----
-async def stream_completions(client: Serverless, *, model: str, prompt: str, **kwargs):
+async def stream_completions(client: Serverless, *, model: str, prompt: str, endpoint_name: str, **kwargs):
 
-    endpoint = await client.get_endpoint(name=ENDPOINT_NAME)
+    endpoint = await client.get_endpoint(name=endpoint_name)
 
     payload = {
         "model": model,
@@ -144,9 +144,9 @@ async def stream_completions(client: Serverless, *, model: str, prompt: str, **k
     resp = await endpoint.request("/v1/completions", payload, cost=payload["max_tokens"], stream=True)
     return resp["response"]  # async generator
 
-async def stream_chat_completions(client: Serverless, *, model: str, messages: List[Dict[str, Any]], **kwargs):
+async def stream_chat_completions(client: Serverless, *, model: str, messages: List[Dict[str, Any]], endpoint_name: str, **kwargs):
 
-    endpoint = await client.get_endpoint(name=ENDPOINT_NAME)
+    endpoint = await client.get_endpoint(name=endpoint_name)
 
     payload = {
         "model": model,
@@ -166,9 +166,10 @@ async def stream_chat_completions(client: Serverless, *, model: str, messages: L
 class APIDemo:
     """Demo and testing functionality for the API client"""
 
-    def __init__(self, client: Serverless, model: str, tool_manager: Optional[ToolManager] = None):
+    def __init__(self, client: Serverless, model: str, endpoint_name: str, tool_manager: Optional[ToolManager] = None):
         self.client = client
         self.model = model
+        self.endpoint_name = endpoint_name
         self.tool_manager = tool_manager or ToolManager()
 
     # ----- Streaming handler -----
@@ -177,10 +178,15 @@ class APIDemo:
         reasoning_content = ""
         printed_reasoning = False
         printed_answer = False
+        finish_reason = None
 
         async for chunk in stream:
             choice = (chunk.get("choices") or [{}])[0]
             delta = choice.get("delta", {})
+            
+            # Track finish reason
+            if choice.get("finish_reason"):
+                finish_reason = choice.get("finish_reason")
 
             # reasoning tokens
             rc = delta.get("reasoning_content")
@@ -211,6 +217,8 @@ class APIDemo:
                 print(f"Reasoning tokens: {len(reasoning_content.split())}")
             if printed_answer:
                 print(f"Response tokens: {len(full_response.split())}")
+            if finish_reason:
+                print(f"Finish reason: {finish_reason}")
 
         return full_response
     
@@ -223,6 +231,7 @@ class APIDemo:
             client=self.client,
             model=self.model,
             prompt=COMPLETIONS_PROMPT,
+            endpoint_name=self.endpoint_name,
             max_tokens=MAX_TOKENS,
             temperature=DEFAULT_TEMPERATURE,
         )
@@ -241,6 +250,7 @@ class APIDemo:
                 client=self.client,
                 model=self.model, 
                 messages=messages,
+                endpoint_name=self.endpoint_name,
                 max_tokens=MAX_TOKENS,
                 temperature=DEFAULT_TEMPERATURE
             )
@@ -253,6 +263,7 @@ class APIDemo:
                 client=self.client,
                 model=self.model, 
                 messages=messages,
+                endpoint_name=self.endpoint_name,
                 max_tokens=MAX_TOKENS,
                 temperature=DEFAULT_TEMPERATURE
             )
@@ -279,6 +290,7 @@ class APIDemo:
                 client=self.client,
                 model=self.model,
                 messages=messages,
+                endpoint_name=self.endpoint_name,
                 tools=minimal_tool,
                 tool_choice="none",
                 max_tokens=10
@@ -304,6 +316,7 @@ class APIDemo:
             client=self.client,
             model=self.model,
             messages=messages,
+            endpoint_name=self.endpoint_name,
             tools=self.tool_manager.get_ls_tool_definition(),
             tool_choice="auto",
             max_tokens=MAX_TOKENS,
@@ -381,6 +394,7 @@ class APIDemo:
             client=self.client,
             model=self.model,
             messages=messages,
+            endpoint_name=self.endpoint_name,
             max_tokens=MAX_TOKENS,
             temperature=DEFAULT_TEMPERATURE,
         )
@@ -419,7 +433,6 @@ class APIDemo:
         print("=" * 60)
         print("INTERACTIVE STREAMING CHAT")
         print("=" * 60)
-        print(f"Using model: {self.model}")
         print("Type 'quit' to exit, 'clear' to clear history")
         print()
 
@@ -445,7 +458,8 @@ class APIDemo:
                 stream = await stream_chat_completions(
                     client=self.client,
                     model=self.model, 
-                    messages=messages, 
+                    messages=messages,
+                    endpoint_name=self.endpoint_name,
                     max_tokens=MAX_TOKENS, 
                     temperature=0.7
                 )
@@ -465,8 +479,8 @@ class APIDemo:
 # ---------------------- CLI ----------------------
 def build_arg_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Vast vLLM Demo (Serverless SDK)")
-    p.add_argument("--model", required=True, help="Model to use for requests (required)")
-    p.add_argument("--endpoint", default="my-vllm-endpoint", help="Vast endpoint name (default: my-vllm-endpoint)")
+    p.add_argument("--model", default=DEFAULT_MODEL, help=f"Model to use for requests (default: {DEFAULT_MODEL})")
+    p.add_argument("--endpoint", default=ENDPOINT_NAME, help=f"Vast endpoint name (default: {ENDPOINT_NAME})")
 
     modes = p.add_mutually_exclusive_group(required=False)
     modes.add_argument("--completion", action="store_true", help="Test completions endpoint")
@@ -494,12 +508,14 @@ async def main_async():
         print("Please specify exactly one test mode")
         sys.exit(1)
 
-    print(f"Using model: {args.model}")
     print("=" * 60)
+    print(f"Using model: {args.model}")
+    print(f"Using endpoint: {args.endpoint}")
+
 
     try:
         async with Serverless() as client:
-            demo = APIDemo(client, args.model, ToolManager())
+            demo = APIDemo(client, args.model, args.endpoint, ToolManager())
 
             if args.completion:
                 await demo.demo_completions()

@@ -114,7 +114,7 @@ then
     if ! uv venv --python-preference only-managed "$ENV_PATH" -p 3.10; then
         report_error_and_exit "Failed to create virtual environment"
     fi
-
+    
     if ! source "$ENV_PATH/bin/activate"; then
         report_error_and_exit "Failed to activate virtual environment"
     fi
