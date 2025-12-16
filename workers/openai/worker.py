@@ -30,7 +30,7 @@ WORD_LIST = nltk.corpus.words.words()
 
 def request_parser(request):
     data = request
-    if request.get("input"):
+    if request.get("input") is not None:
         data = request.get("input")
     return data
 
