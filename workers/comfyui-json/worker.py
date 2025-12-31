@@ -61,18 +61,14 @@ worker_config = WorkerConfig(
     model_server_port=MODEL_SERVER_PORT,
     model_log_file=MODEL_LOG_FILE,
     model_healthcheck_url=MODEL_HEALTHCHECK_ENDPOINT,
-    max_sessions=7,
     handlers=[
         HandlerConfig(
             route="/generate/sync",
             allow_parallel_requests=False,
+            max_queue_time=10.0,
             benchmark_config=BenchmarkConfig(
                 dataset=benchmark_dataset,
             )
-        ),
-        HandlerConfig(
-            route="/generate",
-            allow_parallel_requests=False,
         )
     ],
     log_action_config=LogActionConfig(
