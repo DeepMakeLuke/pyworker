@@ -78,7 +78,8 @@ echo_var DEBUG_LOG
 echo_var PYWORKER_LOG
 echo_var MODEL_LOG
 
-if [ -e "$MODEL_LOG" ]; then
+ROTATE_MODEL_LOG="${ROTATE_MODEL_LOG:-false}"
+if [ "$ROTATE_MODEL_LOG" = "true" ] && [ -e "$MODEL_LOG" ]; then
     echo "Rotating model log at $MODEL_LOG to $MODEL_LOG.old"
     if ! cat "$MODEL_LOG" >> "$MODEL_LOG.old"; then
         report_error_and_exit "Failed to rotate model log"
