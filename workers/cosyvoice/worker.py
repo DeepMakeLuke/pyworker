@@ -1,43 +1,51 @@
 """
 CosyVoice TTS Worker for Vast.ai Serverless
 
-This worker proxies TTS requests to a CosyVoice model server running
-on port 8188. Compatible with neosun/cosyvoice Docker image.
+This worker proxies TTS requests to a CosyVoice model server (neosun/cosyvoice)
+running on port 8188. Uses OpenAI-compatible API.
 
 Usage:
     Set BACKEND=cosyvoice in your Vast.ai template environment variables.
 """
 from vastai import Worker, WorkerConfig, HandlerConfig, LogActionConfig, BenchmarkConfig
 
-# CosyVoice model configuration
+# CosyVoice model configuration (neosun/cosyvoice image)
 MODEL_SERVER_URL           = 'http://127.0.0.1'
 MODEL_SERVER_PORT          = 8188
 MODEL_LOG_FILE             = "/var/log/cosyvoice.log"
 MODEL_HEALTHCHECK_ENDPOINT = "/health"
 
-# CosyVoice-specific log messages (check actual CosyVoice logs for correct patterns)
+# Log patterns for PyWorker detection
+# These patterns indicate the server is ready
 MODEL_LOAD_LOG_MSG = [
     "Uvicorn running on",
     "Application startup complete",
+    "INFO:     Started server process",
 ]
 
 MODEL_ERROR_LOG_MSGS = [
     "Error:",
     "Exception:",
     "Traceback (most recent call last):",
+    "CUDA out of memory",
 ]
 
 MODEL_INFO_LOG_MSGS = [
-    "Loading model",
+    "Loading",
+    "INFO:",
 ]
 
 
 def benchmark_generator() -> dict:
-    """Generate a benchmark request for capacity estimation."""
-    benchmark_data = {
-        "text": "Hello, this is a test of the text to speech system.",
+    """Generate a benchmark request for capacity estimation.
+
+    Uses OpenAI-compatible TTS API format.
+    """
+    return {
+        "model": "cosyvoice",
+        "input": "Hello, this is a test of the text to speech system.",
+        "voice": "default",
     }
-    return benchmark_data
 
 
 worker_config = WorkerConfig(
@@ -47,7 +55,7 @@ worker_config = WorkerConfig(
     model_healthcheck_url=MODEL_HEALTHCHECK_ENDPOINT,
     handlers=[
         HandlerConfig(
-            route="/api/tts",
+            route="/v1/audio/speech",
             allow_parallel_requests=False,
             max_queue_time=120.0,
             benchmark_config=BenchmarkConfig(
@@ -55,7 +63,7 @@ worker_config = WorkerConfig(
                 concurrency=1,
                 runs=3
             ),
-            workload_calculator=lambda x: len(x.get("text", ""))
+            workload_calculator=lambda x: len(x.get("input", ""))
         ),
     ],
     log_action_config=LogActionConfig(
